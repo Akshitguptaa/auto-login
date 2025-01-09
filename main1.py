@@ -10,6 +10,7 @@ import threading
 import xml.etree.ElementTree as ET
 import tkinter as tk
 from tkinter import ttk, messagebox
+import subprocess
 
 Base=declarative_base()
 
@@ -167,6 +168,9 @@ class AutoLoginApp:
         self.auto_login_thread = threading.Thread(target=self.auto_login_loop)
         self.auto_login_thread.start()
 
+        self.ping_thread = threading.Thread(target=self.ping_check)
+        self.ping_thread.start()
+
     def auto_login_loop(self):
         # chutiya wifi...
 
@@ -268,6 +272,20 @@ class AutoLoginApp:
                 messagebox.showerror("Error", "Failed to communicate with the server.")
         else:
             messagebox.showerror("Error", "Please enter a valid username and password.")
+
+    def ping_check(self):
+        # pinging in the background
+        while self.running:
+            result = subprocess.run(['ping','-c','1','jiit.ac.in'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            if result.returncode != 0:
+                # if ping fails, attempt to reconnect or re-login
+                self.status_label.configure(text="Disconnected. Attempting to reconnect...")
+                self.start_auto_login()  # restart login attempts if disconnected
+            else:
+                self.status_label.configure(text="Connection is stable.")
+            
+            time.sleep(10)  # 10 second delay
 
     def updateTimer(self):
         samay=time.time()-self.start_time
