@@ -87,13 +87,32 @@ class AutoLoginApp:
         self.auto_login_thread = None
         self.running = False
         self.credentials = []
-        self.start_time = time.time()  
+        self.start_time = time.time()
 
         self.setup_ui()
 
     def setup_ui(self):
-        self.main_frame = ttk.Frame(self.root)
-        self.main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        self.style = ttk.Style()
+        self.style.configure("TButton",
+                             font=("Arial", 12, "bold"),
+                             padding=10,
+                             background="#4CAF50", 
+                             foreground="white",
+                             focuscolor="#45a049",
+                             relief="flat")
+        self.style.configure("TLabel",
+                             font=("Arial", 12),
+                             background="#f4f4f4",
+                             foreground="black")
+        self.style.configure("TLabelFrame",
+                             font=("Arial", 14, "bold"),
+                             background="#f4f4f4",
+                             foreground="black")
+        self.style.configure("TFrame",
+                             background="#f4f4f4")
+
+        self.main_frame = ttk.Frame(self.root, padding="10")
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
 
         self.credentials_frame = ttk.LabelFrame(self.main_frame, text="Credentials", padding="10")
         self.credentials_frame.pack(fill=tk.X, pady=10)
@@ -101,35 +120,33 @@ class AutoLoginApp:
         # data input
 
         ttk.Label(self.credentials_frame, text="Username:").pack(anchor="w")
-        self.username_entry = ttk.Entry(self.credentials_frame)
+        self.username_entry = ttk.Entry(self.credentials_frame, font=("Arial", 12))
         self.username_entry.pack(fill=tk.X, pady=(0, 10))
 
-
-
         ttk.Label(self.credentials_frame, text="Password:").pack(anchor="w")
-        self.password_entry = ttk.Entry(self.credentials_frame, show="*")
+        self.password_entry = ttk.Entry(self.credentials_frame, show="*", font=("Arial", 12))
         self.password_entry.pack(fill=tk.X, pady=(0, 10))
 
         # add data
         self.add_button = ttk.Button(self.credentials_frame, text="Add Credential", command=self.add_credential)
-        self.add_button.pack(fill=tk.X)
+        self.add_button.pack(fill=tk.X, pady=5)
 
         self.control_frame = ttk.LabelFrame(self.main_frame, text="Control", padding="10")
         self.control_frame.pack(fill=tk.X, pady=10)
 
         # auto login 
         self.toggle_button = ttk.Button(self.control_frame, text="Start Auto Login", command=self.toggle_auto_login)
-        self.toggle_button.pack(fill=tk.X)
+        self.toggle_button.pack(fill=tk.X, pady=5)
 
         # logout
         self.logout_button = ttk.Button(self.control_frame, text="Logout", command=self.logout)
-        self.logout_button.pack(fill=tk.X)
+        self.logout_button.pack(fill=tk.X, pady=5)
 
         self.status_label = ttk.Label(self.control_frame, text="Status: Stopped")
         self.status_label.pack(pady=10)
 
         # time spent label
-        self.timer_label = ttk.Label(self.root, text="Time Elapsed: 0s", anchor="w")
+        self.timer_label = ttk.Label(self.root, text="Time Elapsed: 0s", anchor="w", font=("Arial", 12))
         self.timer_label.pack(fill=tk.X, side=tk.BOTTOM, padx=10, pady=10)
 
         # auto time updating 
@@ -142,11 +159,11 @@ class AutoLoginApp:
         if username and password:
             self.credential_manager.add_credential(username, password)
             print("added new data")
-            messagebox.showinfo("Success", f"credential for '{username}' added successfully!")
+            messagebox.showinfo("Success", f"Credential for '{username}' added successfully!")
             self.username_entry.delete(0, tk.END)
             self.password_entry.delete(0, tk.END)
         else:
-            messagebox.showerror("Error", "Please enter in both username and password.")
+            messagebox.showerror("Error", "Please enter both username and password.")
 
     def toggle_auto_login(self):
         if self.running:
@@ -284,6 +301,9 @@ class AutoLoginApp:
                 self.start_auto_login()  # restart login attempts if disconnected
             else:
                 self.status_label.configure(text="Connection is stable.")
+
+
+            # self.root.after(0, self.update_status_label, success)
             
             time.sleep(10)  # 10 second delay
 
