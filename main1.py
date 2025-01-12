@@ -170,6 +170,8 @@ class AutoLoginApp:
             self.running = False
             self.toggle_button.configure(text="Start Auto Login")
             self.status_label.configure(text="Status: Stopped")
+            self.cleanup_threads()
+
         else:
             self.running = True
             self.toggle_button.configure(text="Stop Auto Login")
@@ -182,49 +184,51 @@ class AutoLoginApp:
             messagebox.showerror("Error", "No credentials available for login.")
             return
 
-        self.auto_login_thread = threading.Thread(target=self.auto_login_loop)
+        self.auto_login_thread = threading.Thread(target=self.auto_login_loop,daemon=True)
         self.auto_login_thread.start()
 
-        self.ping_thread = threading.Thread(target=self.ping_check)
+        self.ping_thread = threading.Thread(target=self.ping_check,daemon=True)
         self.ping_thread.start()
 
     def auto_login_loop(self):
         # chutiya wifi...
 
         maxx = 3  #retry limit for auto login
-        c = 0
-        while self.running and c<len(self.credentials):
-            username=self.credentials[c]['username']
-            password=self.credentials[c]['password']
-            count = 0
+        c = 0  
+        def login_step():
+            nonlocal c 
+            if not self.running or c >= len(self.credentials):
+                self.status_label.configure(text="Status: Stopped")
+                return
+            
+            username = self.credentials[c]['username']
+            password = self.credentials[c]['password']
+            retries = 0
 
-            while count<maxx and self.running:
-                success = self.login(username, password)
-
-                if success:
-                    self.status_label.configure(text=f"Logged in as {username}")
-                    time.sleep(120)   #cing login again 
-                    break
+            def try_login():
+                nonlocal retries, c 
+                if retries < maxx and self.running:
+                    success = self.login(username, password)
+                    if success:
+                        self.status_label.configure(text=f"Logged in as {username}")
+                        c += 1 
+                        self.root.after(1000, login_step)   #cing login again 
+                    else:
+                        retries += 1
+                        self.status_label.configure(text=f"Login failed for {username}. Retry {retries}/{maxx}.")
+                        self.root.after(5000, try_login)
                 else:
-                    count += 1
-                    self.status_label.configure(text=f"Login failed for {username}. Retry {count}/{maxx}.")
-                    time.sleep(5)
+                    self.status_label.configure(text=f"Failed to login with {username}. Moving to next.")
+                    c += 1
+                    self.root.after(1000, login_step)
 
-            # for multiple credential available 
+            try_login()
+
+        login_step()# for multiple credential available 
             # after max count
-            if count >= maxx:
-                self.status_label.configure(text=f"Failed to login with {username}. Moving to next.")
-                c += 1
 
-            if self.running and count < maxx:
-                time.sleep(120)
-
-        if not self.running:
-            print("login stopped")
-            self.status_label.configure(text="Status: Stopped")
 
     def login(self, username, password):
-        """Simulate login request"""
         payload = {
             'mode': '191',
             'username': username,
@@ -292,7 +296,7 @@ class AutoLoginApp:
 
     def ping_check(self):
         # pinging in the background
-        while self.running:
+        def ping_step():
             result = subprocess.run(['ping','-c','1','jiit.ac.in'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             
             if result.returncode != 0:
@@ -305,7 +309,10 @@ class AutoLoginApp:
 
             # self.root.after(0, self.update_status_label, success)
             
-            time.sleep(10)  # 10 second delay
+            # time.sleep(10)  # 10 second delay
+            if self.running:
+                self.root.after(10000, ping_step)
+        ping_step() 
 
     def updateTimer(self):
         samay=time.time()-self.start_time
@@ -314,6 +321,13 @@ class AutoLoginApp:
         self.timer_label.config(text=time_str)
         
         self.root.after(1000, self.updateTimer)
+
+    def cleanup_threads(self):
+        if self.auto_login_thread is not None:
+            self.auto_login_thread.join()
+        if self.ping_thread is not None:
+            self.ping_thread.join()
+
 
 if __name__ == "__main__":
     app = AutoLoginApp()
