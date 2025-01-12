@@ -88,6 +88,7 @@ class AutoLoginApp:
         self.running = False
         self.credentials = []
         self.start_time = time.time()
+        self.reconnect_needed = False
 
         self.setup_ui()
 
@@ -194,41 +195,38 @@ class AutoLoginApp:
         # chutiya wifi...
 
         maxx = 3  #retry limit for auto login
-        c = 0  
-        def login_step():
-            nonlocal c 
-            if not self.running or c >= len(self.credentials):
-                self.status_label.configure(text="Status: Stopped")
-                return
-            
-            username = self.credentials[c]['username']
-            password = self.credentials[c]['password']
-            retries = 0
-
-            def try_login():
-                nonlocal retries, c 
-                if retries < maxx and self.running:
-                    success = self.login(username, password)
-                    if success:
-                        self.status_label.configure(text=f"Logged in as {username}")
-                        c += 1 
-                        self.root.after(1000, login_step)   #cing login again 
-                    else:
-                        retries += 1
-                        self.status_label.configure(text=f"Login failed for {username}. Retry {retries}/{maxx}.")
-                        self.root.after(5000, try_login)
+        c = 0
+        while self.running and c<len(self.credentials):
+            username=self.credentials[c]['username']
+            password=self.credentials[c]['password']
+            count = 0
+            while count<maxx and self.running:
+                success = self.login(username, password)
+                if success:
+                    self.status_label.configure(text=f"Logged in as {username}")
+                    time.sleep(120)   #cing login again 
+                    break
                 else:
-                    self.status_label.configure(text=f"Failed to login with {username}. Moving to next.")
-                    c += 1
-                    self.root.after(1000, login_step)
+                    count += 1
+                    self.status_label.configure(text=f"Login failed for {username}. Retry {count}/{maxx}.")
+                    time.sleep(5)
 
-            try_login()
-
-        login_step()# for multiple credential available 
+            # for multiple credential available 
             # after max count
+            if count >= maxx:
+                self.status_label.configure(text=f"Failed to login with {username}. Moving to next.")
+                c += 1
+
+            if self.running and count < maxx:
+                time.sleep(120)
+
+        if not self.running:
+            print("login stopped")
+            self.status_label.configure(text="Status: Stopped")
 
 
     def login(self, username, password):
+        """Simulate login request"""
         payload = {
             'mode': '191',
             'username': username,
@@ -248,7 +246,7 @@ class AutoLoginApp:
                     return True
                 elif "Invalid username or password" in message.text:
                     messagebox.showerror("Login Failed", f"Invalid credentials for {username}.")
-                    
+
                 #adding few more error checks 
                 #                 
                 elif "Data limit reached" in message.text:
@@ -296,9 +294,9 @@ class AutoLoginApp:
 
     def ping_check(self):
         # pinging in the background
-        def ping_step():
+        while self.running:
             result = subprocess.run(['ping','-c','1','jiit.ac.in'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            
+
             if result.returncode != 0:
                 # if ping fails, attempt to reconnect or re-login
                 self.status_label.configure(text="Disconnected. Attempting to reconnect...")
@@ -308,11 +306,8 @@ class AutoLoginApp:
 
 
             # self.root.after(0, self.update_status_label, success)
-            
-            # time.sleep(10)  # 10 second delay
-            if self.running:
-                self.root.after(10000, ping_step)
-        ping_step() 
+
+            time.sleep(10)  # 10 second delay
 
     def updateTimer(self):
         samay=time.time()-self.start_time
